@@ -31,12 +31,12 @@ def ListVMdomains(src_conn):
 	listd.sort()
 
 	print("""---------------------------------------------------
-	ANO KVM QEMU VM Migration system
-		Virtual Machines list
+	ANO KVM QEMU VM Migration tool
+	Virtual Machines list
 --------------------------------------------------- 
 		""")
 	if(listd):
-		print('	ID: 0  -- To Migration all the machines \n\n')
+		print(' ID: 0  -- To Migration all the machines \n\n')
 		for i in listd:
 			d = src_conn.lookupByID(i)
 			print(" VM ID:{} -- VM Name:{}".format(i,d.name()))
@@ -55,7 +55,7 @@ def ExportVM(src_conn,vmid):
 		vm_name = vm.name()
 
 		## Prin 
-		print("Export VM {} DomXML".format(vm_name))
+		print("1. Export VM \"{}\" DomXML\n".format(vm_name))
 
 		## find drive configuration from source server
 		if(vm.isActive()):
@@ -83,6 +83,7 @@ def ExportVM(src_conn,vmid):
 	return Disks,xmldom
 
 def ImportVM(conn,data,domxml):
+	print("3. ------- START Move disk images -------")
 	for i in data:
 		rsync = 'rsync -avP -e"ssh -p {PORT} -i {KEY}" {SRC_PATH} {USER}@{HOST}:{DST_PATH}'.format(
 			PORT=DST_PORT,
@@ -93,17 +94,23 @@ def ImportVM(conn,data,domxml):
 			DST_PATH=DST_STORAGE_PATH+'/'
 		)
 		dimg = i['disk']['source']['file'].split('/')
-		print("Copying disk image: {}".format(dimg[-1]))
+		print("\t Copying disk image: \"{}\"".format(dimg[-1]))
 		stdout,stderr = run_cmd(rsync)
 		if(stderr):
 			print('ERROR Unable to copy the disk image: {}'.fomrat(stderr))
 			exit(1)
-		print('------------------ rsync result for img: {}: ------------------'.format(dimg[-1]))
-		print(stdout)
+		print(' --- start rsync result for img: \"{}\": ---\n'.format(dimg[-1]))
+		print(' \"{}\" \n'.format(stdout))
+		print(' --- end rsync result for img: \"{}\": ---\n'.format(dimg[-1]))
+	print("3. ------- END Move disk images -------\n")
 	### importing DomXML
-	print('Importing DomXML to host: {}'.format(DST_HOST))
+	print('4. Importing DomXML to host: \"{}\"\n'.format(DST_HOST))
 	dom = conn.defineXML(domxml)
+	if dom == None:
+ 		print('Failed to define a domain from an XML definition.')
+ 		exit(1)
 	dom.create()
+	print("5. VM \"{}\" has booted".format(dom.name()))
 
 def main():
 	src_conn = ConnectToQEMU(remote=False)
@@ -114,18 +121,18 @@ def main():
 	if(vmids):
 		for vmid in vmids:
 			vm = src_conn.lookupByID(vmid)
-			print('-------------- Start migration for VM: {} --------------'.format(vm.name()))
+			print('-------------- Start migration for VM: \"{}\" --------------\n'.format(vm.name()))
 			Disks,domxml = ExportVM(src_conn,vmid)
-			print("Shutting down VM {}".format(vm.name()))
+			print("2. Shutting down VM \"{}\"\n".format(vm.name()))
 			vm.shutdown()
 			while True:
 				if(not vm.isActive()):
 					ImportVM(dst_conn,Disks,domxml)
 					break
 				sleep(1)
-			print('-------------- End migration for VM: {} --------------\n\n'.format(vm.name()))
+			print('-------------- End migration for VM: \"{}\" --------------\n\n'.format(vm.name()))
 	else:
-		print('No VMs to migrate')
+		print(' ----------- No VMs to migrate :) -------------')
 
 	src_conn.close()
 	dst_conn.close()
